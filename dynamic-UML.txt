@@ -1,0 +1,24 @@
+@startuml
+
+actor User
+participant CommandParser
+participant CommandHandler
+participant FormatPrinter
+participant StorageManager
+participant NotificationManager
+database TaskStorage
+participant OS
+
+User -> CommandParser: User input
+CommandParser -> CommandHandler: Preprocessed args
+CommandHandler --> NotificationManager: New tasks
+NotificationManager --> OS: Notification data
+CommandHandler --> StorageManager: New tasks
+StorageManager --> TaskStorage: New tasks
+TaskStorage --> StorageManager: Requested tasks
+StorageManager --> CommandHandler: Requested tasks
+CommandHandler -> FormatPrinter: Command execution result
+FormatPrinter -> User: Formatted ouput
+
+
+@enduml
