@@ -1,52 +1,30 @@
 @startuml
 class CommandHandler {
-  void AddTask(Task)
-  void ShowTasks(Condition)
-  void DeleteTasks(Condition)
-  void ChangeTasks(Condition)
+  -Condition BuildCondition(args)
+  +void AddTask(args)
+  +void ShowTasks(args)
+  +void DeleteTasks(args)
+  +void ChangeTasks(args)
 }
 
 class StorageManager {
-  void AddTask(Task)
-  List<Task> SelectTasks(Condition)
-  void DeleteTasks(Condition)
-  void ChangeTasks(Condition)
-}
-
-StorageManager <-- Storage
-StorageManager --> CommandHandler
-StorageManager <-- Task
-FormatPrinter --> CommandHandler
-Task --> CommandHandler
-NotificationManager --> CommandHandler
-Task --> FormatPrinter
-
-
-class Storage {
-  DataBase
-  SELECT, INSERT, DELETE
-}
-
-class Task {
-CreateTime: timestamp
-Deadline: timestamp
-NotificationTime: timestamp
-Description: string
-Tag: string
-Priority: enum
-Status: enum
-
-
-   GetField(string name)
-   SetField(string name)
+  +void AddTask(Task)
+  +List<Task> SelectTasks(Condition)
+  +void DeleteTasks(Condition)
+  +void ChangeTasks(Condition)
 }
 
 class NotificationManager {
-  void ScheduleNotifcation(Task task)
+  +void ScheduleNotifcation(Task task)
 }
 
 class FormatPrinter {
-  void PrintTasks(List<Task> tasks, List<string> fields)
-  void PrintShortDescription(List<Task> tasks)
+  -config: Map<Strung, Object>
+  +void PrintTasks(List<Task> tasks, Map<Strung, Object> config)
 }
+
+CommandHandler "1" *-- FormatPrinter
+CommandHandler "1" *-- NotificationManager
+CommandHandler "1" *-- StorageManager
+
 @enduml
