@@ -1,0 +1,30 @@
+@startuml
+class CommandHandler {
+  -Condition BuildCondition(args)
+  +void AddTask(args)
+  +void ShowTasks(args)
+  +void DeleteTasks(args)
+  +void ChangeTasks(args)
+}
+
+class StorageManager {
+  +void AddTask(Task)
+  +List<Task> SelectTasks(Condition)
+  +void DeleteTasks(Condition)
+  +void ChangeTasks(Condition)
+}
+
+class NotificationManager {
+  +void ScheduleNotifcation(Task task)
+}
+
+class FormatPrinter {
+  -config: Map<Strung, Object>
+  +void PrintTasks(List<Task> tasks, Map<Strung, Object> config)
+}
+
+CommandHandler "1" *-- FormatPrinter
+CommandHandler "1" *-- NotificationManager
+CommandHandler "1" *-- StorageManager
+
+@enduml
