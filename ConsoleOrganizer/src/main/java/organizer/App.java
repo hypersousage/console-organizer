@@ -11,21 +11,48 @@ import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.UUID;
 import java.text.MessageFormat;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class App {
   private Gson gson;
+  private TaskWriter TaskWrite;
 
-  public void App() {
+  public App() {
     this.gson = new Gson();
+    this.TaskWrite = new SimpleWriter(true);
   }
 
   public void run(String[] args) {
     CommandLine line = parseArguments(args);
     if (line.hasOption("add")) {
-      addTask(line.getOptionValue("add"));
+      Task currentTask = new Task(generateTaskID());
+      if (line.hasOption("deadline")) {
+        if (!currentTask.parseDeadline(line.getOptionValue("deadline"))) {
+          System.out.println("Deadline format is not correct! It should be yyyy-MM-dd HH:mm:ss");
+          return;
+        }
+      }
+      if (line.hasOption("priority")) {
+        if (!currentTask.parsePriority(line.getOptionValue("priority"))) {
+          System.out.println("Priority format is not correct! It should be one of {LOW, MEDIUM, HIGH}");
+          return;
+        }
+      }
+      if (line.hasOption("tags")) {
+        var tags = line.getOptionValues("tags");
+        for (String tag : tags) {
+          currentTask.addTag(tag);
+        }
+      }
+      if (line.hasOption("remind")) {
+        currentTask.setNeedReminder();
+      }
+      currentTask.setDescription(line.getOptionValue("add"));
+      addTask(currentTask);
     } else if (line.hasOption("list")) {
       listTasks();
     } else if (line.hasOption("delete")) {
@@ -36,13 +63,13 @@ public class App {
     }
   }
 
-  private void addTask(String description) {
+  private void addTask(Task task) {
     Jedis jedis = new Jedis();
-    String new_uuid = generateUUID();
     var tasks = jedis.hgetAll("tasks");
-    tasks.put(new_uuid, description);
+    tasks.put(Integer.toString(task.TaskID), task.taskToString());
     jedis.hmset("tasks", tasks);
-    System.out.println("Assigned uuid " + new_uuid + " to new task \"" + description + "\"");
+    System.out.println("Task serialized is " + task.taskToString());
+    System.out.println("Put task with id " + task.TaskID + " with description \"" + task.Description + "\"");
   }
 
   private void listTasks() {
@@ -54,9 +81,14 @@ public class App {
       return;
     }
     System.out.println(MessageFormat.format("You have {0} tasks in storage:", tasks.size()));
+    ArrayList<Task> tasksArray = new ArrayList<>();
     for (Map.Entry<String, String> entry : tasks.entrySet()) {
-      System.out.println(MessageFormat.format("{0} \t {1}", entry.getKey(), entry.getValue()));
+      Task task = new Task(0);
+      if (task.fromString(entry.getValue())) {
+        tasksArray.add(task);
+      }
     }
+    System.out.print(TaskWrite.serializeTasks(tasksArray));
   }
 
   private void deleteTask(String uuid) {
@@ -68,12 +100,6 @@ public class App {
     } else {
       System.out.println("No task found with such uuid");
     }
-  }
-
-
-  private String generateUUID() {
-    String uuid = UUID.randomUUID().toString().replace("-", "");
-    return uuid.substring(0, 6);
   }
 
   private CommandLine parseArguments(String[] args) {
@@ -97,6 +123,10 @@ public class App {
     return line;
   }
 
+  private int generateTaskID() {
+    return ThreadLocalRandom.current().nextInt(0, 10000 + 1);
+  }
+
   private Options getOptions() {
 
     var options = new Options();
@@ -104,6 +134,8 @@ public class App {
     options.addOption("a", "add", true, "Add task");
     options.addOption("l", "list", false, "List tasks");
     options.addOption("d", "delete", true, "Delete task");
+    options.addOption("dl", "deadline", true, "Task deadline, format 2021-01-01 00:00:00");
+    options.addOption("pr", "priority", true, "Task priority, one of {LOW, MEDIUM, HIGH}");
 
     return options;
   }
@@ -116,3 +148,4 @@ public class App {
     formatter.printHelp("ConsoleOrganizer", options, true);
   }
 }
+
