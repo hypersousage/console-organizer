@@ -6,8 +6,10 @@ import java.util.List;
 
 public class SimpleWriter extends TaskWriter {
   boolean SortByDeadline;
-  public SimpleWriter(boolean sortByDeadline) {
+  boolean SortByPriority;
+  public SimpleWriter(boolean sortByDeadline, boolean sortByPriority) {
     SortByDeadline = sortByDeadline;
+    SortByPriority = sortByPriority;
   }
 
   @Override
@@ -30,6 +32,23 @@ public class SimpleWriter extends TaskWriter {
         }
       });
     }
+    if (SortByPriority) {
+      Collections.sort(tasks, new Comparator<>() {
+        @Override
+        public int compare(Task o1, Task o2) {
+          if (o1.Priority != null && o2.Priority != null) {
+            return o1.Priority.compareTo(o2.Priority);
+          }
+          if (o1.Priority != null) {
+            return -1;
+          }
+          if (o2.Priority != null) {
+            return 1;
+          }
+          return 0;
+        }
+      });
+    }
     for (Task task : tasks) {
       builder.append("TaskID=" + task.TaskID + ", Description=" + task.Description + ", Reminder=" + task.Reminder);
       if (task.Deadline != null) {
@@ -38,6 +57,7 @@ public class SimpleWriter extends TaskWriter {
       if (task.Priority != null) {
         builder.append(", Priority=" + task.Priority);
       }
+      builder.append(", Tags=" + task.Tags.toString());
       builder.append("\n");
     }
     return builder.toString();

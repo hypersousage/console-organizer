@@ -1,60 +1,56 @@
 package organizer;
 
+import org.apache.commons.cli.*;
 import redis.clients.jedis.Jedis;
 
 import com.google.gson.Gson;
 
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.DefaultParser;
-import org.apache.commons.cli.HelpFormatter;
-import org.apache.commons.cli.Options;
-import org.apache.commons.cli.ParseException;
-
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.text.MessageFormat;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class App {
   private Gson gson;
-  private TaskWriter TaskWrite;
 
   public App() {
     this.gson = new Gson();
-    this.TaskWrite = new SimpleWriter(true);
   }
 
   public void run(String[] args) {
     CommandLine line = parseArguments(args);
+    Task currentTask = new Task(generateTaskID());
+    if (line.hasOption("deadline")) {
+      if (!currentTask.parseDeadline(line.getOptionValue("deadline"))) {
+        System.out.println("Deadline format is not correct! It should be yyyy-MM-dd HH:mm:ss");
+        return;
+      }
+    }
+    if (line.hasOption("priority")) {
+      if (!currentTask.parsePriority(line.getOptionValue("priority"))) {
+        System.out.println("Priority format is not correct! It should be one of {LOW, MEDIUM, HIGH}");
+        return;
+      }
+    }
+    if (line.hasOption("tag")) {
+      var tags = line.getOptionValues("tag");
+      for (String tag : tags) {
+        currentTask.addTag(tag);
+      }
+    }
+    if (line.hasOption("remind")) {
+      currentTask.setNeedReminder();
+    }
+
     if (line.hasOption("add")) {
-      Task currentTask = new Task(generateTaskID());
-      if (line.hasOption("deadline")) {
-        if (!currentTask.parseDeadline(line.getOptionValue("deadline"))) {
-          System.out.println("Deadline format is not correct! It should be yyyy-MM-dd HH:mm:ss");
-          return;
-        }
-      }
-      if (line.hasOption("priority")) {
-        if (!currentTask.parsePriority(line.getOptionValue("priority"))) {
-          System.out.println("Priority format is not correct! It should be one of {LOW, MEDIUM, HIGH}");
-          return;
-        }
-      }
-      if (line.hasOption("tags")) {
-        var tags = line.getOptionValues("tags");
-        for (String tag : tags) {
-          currentTask.addTag(tag);
-        }
-      }
-      if (line.hasOption("remind")) {
-        currentTask.setNeedReminder();
-      }
       currentTask.setDescription(line.getOptionValue("add"));
       addTask(currentTask);
     } else if (line.hasOption("list")) {
-      listTasks();
+      String type = line.getOptionValue("list");
+      String sortBy = "default";
+      if (line.hasOption("sort-by")) {
+        sortBy = line.getOptionValue("sort-by");
+      }
+      listTasks(type, currentTask, sortBy);
     } else if (line.hasOption("delete")) {
       deleteTask(line.getOptionValue("delete"));
     } else {
@@ -72,7 +68,18 @@ public class App {
     System.out.println("Put task with id " + task.TaskID + " with description \"" + task.Description + "\"");
   }
 
-  private void listTasks() {
+  private void listTasks(String type, Task filterTask, String sortBy) {
+    if (!type.equals("all") && !type.equals("today") && !type.equals("filter")) {
+      System.out.println("Invalid argument value of 'list', should be either 'today', 'all' or 'filter'");
+      return;
+    }
+    if (!sortBy.equals("priority") && !sortBy.equals("deadline") && !sortBy.equals("default")) {
+      System.out.println("Invalid argument value of 'sort-by', should be either 'priority' or 'deadline'");
+      return;
+    }
+    boolean sortByPriority = sortBy.equals("priority");
+    boolean sortByDeadline = sortBy.equals("deadline");
+    TaskWriter TaskWrite = new SimpleWriter(sortByDeadline, sortByPriority);
     Jedis jedis = new Jedis();
     var tasks = jedis.hgetAll("tasks");
     int size = tasks.size();
@@ -80,14 +87,29 @@ public class App {
       System.out.println("You don't have tasks in storage");
       return;
     }
-    System.out.println(MessageFormat.format("You have {0} tasks in storage:", tasks.size()));
+    Calendar today = Calendar.getInstance();
     ArrayList<Task> tasksArray = new ArrayList<>();
     for (Map.Entry<String, String> entry : tasks.entrySet()) {
       Task task = new Task(0);
       if (task.fromString(entry.getValue())) {
+        if (type.equals("today")) {
+          if (task.Deadline == null) {
+            continue;
+          }
+          Calendar deadline = Calendar.getInstance();
+          deadline.setTime(task.Deadline);
+          if (deadline.get(Calendar.DAY_OF_YEAR) != today.get(Calendar.DAY_OF_YEAR)
+                  || deadline.get(Calendar.YEAR) != today.get(Calendar.YEAR))
+          {
+            continue;
+          }
+        } else if (type.equals("filter") && !filterTask.compareTask(task)) {
+          continue;
+        }
         tasksArray.add(task);
       }
     }
+    System.out.println(MessageFormat.format("You have {0} tasks in storage:", tasksArray.size()));
     System.out.print(TaskWrite.serializeTasks(tasksArray));
   }
 
@@ -132,10 +154,12 @@ public class App {
     var options = new Options();
 
     options.addOption("a", "add", true, "Add task");
-    options.addOption("l", "list", false, "List tasks");
+    options.addOption("l", "list", true, "List tasks");
     options.addOption("d", "delete", true, "Delete task");
     options.addOption("dl", "deadline", true, "Task deadline, format 2021-01-01 00:00:00");
     options.addOption("pr", "priority", true, "Task priority, one of {LOW, MEDIUM, HIGH}");
+    options.addOption("t", "tag", true, "Task tag, may be multiple");
+    options.addOption("s", "sort-by", true, "Value to sort tasks by, supported 'priority', 'deadline'");
 
     return options;
   }

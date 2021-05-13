@@ -17,7 +17,7 @@ public class Task {
   int TaskID;
   boolean Reminder;
   String Description;
-  ArrayList<String> Tags;
+  List<String> Tags;
   PriorityEnum Priority;
   Date Deadline;
 
@@ -71,9 +71,10 @@ public class Task {
       values.put("priority", Priority.toString());
     }
     if (Deadline != null) {
-      values.put("deadline", Deadline.toString());
+      DateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+      values.put("deadline", formatter.format(Deadline));
     }
-    values.put("tags", Tags.toString());
+    values.put("tags", Tags.toString().replace(", ", ","));
     return values.toString();
   }
 
@@ -91,7 +92,8 @@ public class Task {
     TaskID = Integer.parseInt(values.get("task_id"));
     Reminder = Boolean.parseBoolean(values.get("reminder"));
     Description = values.get("description");
-    Tags = new ArrayList<>(Arrays.asList(values.get("tags").split(",")));
+    String tagsStr = values.get("tags");
+    Tags = Arrays.asList(tagsStr.substring(1, tagsStr.length() - 1).split(","));
     if (values.containsKey("priority")) {
       Priority = PriorityEnum.valueOf(values.get("priority"));
     }
@@ -103,6 +105,21 @@ public class Task {
           Deadline = parsed;
         }
       } catch (ParseException ignored) {}
+    }
+    return true;
+  }
+
+  public boolean compareTask(Task task) {
+    if (this.Deadline != null && (task.Deadline == null || this.Deadline.compareTo(task.Deadline) != 0)) {
+      return false;
+    }
+    if (this.Priority != null && (task.Priority == null || this.Priority.compareTo(task.Priority) != 0)) {
+      return false;
+    }
+    for (var tag : this.Tags) {
+      if (!task.Tags.contains(tag)) {
+        return false;
+      }
     }
     return true;
   }
