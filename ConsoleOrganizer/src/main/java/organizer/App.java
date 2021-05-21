@@ -59,13 +59,21 @@ public class App {
     }
   }
 
+  private String getRedisHost() {
+    String host = "localhost";
+    if (System.getenv("ORGANIZER_DOCKER_BUILD") != null) {
+      host = "host.docker.internal";
+    }
+    return host;
+  }
+
   private void addTask(Task task) {
-    Jedis jedis = new Jedis();
+    Jedis jedis = new Jedis(getRedisHost());
     var tasks = jedis.hgetAll("tasks");
     tasks.put(Integer.toString(task.TaskID), task.taskToString());
     jedis.hmset("tasks", tasks);
-    System.out.println("Task serialized is " + task.taskToString());
-    System.out.println("Put task with id " + task.TaskID + " with description \"" + task.Description + "\"");
+    // System.out.println("Task serialized is " + );
+    System.out.println("Put task " + task.taskToString());
   }
 
   private void listTasks(String type, Task filterTask, String sortBy) {
@@ -80,7 +88,7 @@ public class App {
     boolean sortByPriority = sortBy.equals("priority");
     boolean sortByDeadline = sortBy.equals("deadline");
     TaskWriter TaskWrite = new SimpleWriter(sortByDeadline, sortByPriority);
-    Jedis jedis = new Jedis();
+    Jedis jedis = new Jedis(getRedisHost());
     var tasks = jedis.hgetAll("tasks");
     int size = tasks.size();
     if (size == 0) {
@@ -114,7 +122,7 @@ public class App {
   }
 
   private void deleteTask(String uuid) {
-    Jedis jedis = new Jedis();
+    Jedis jedis = new Jedis(getRedisHost());
     var tasks = jedis.hgetAll("tasks");
     if (tasks.containsKey(uuid)) {
       jedis.hdel("tasks", uuid);
