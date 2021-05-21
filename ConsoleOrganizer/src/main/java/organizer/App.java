@@ -5,6 +5,7 @@ import redis.clients.jedis.Jedis;
 
 import com.google.gson.Gson;
 
+import java.io.IOException;
 import java.util.*;
 import java.text.MessageFormat;
 import java.util.concurrent.ThreadLocalRandom;
@@ -40,6 +41,9 @@ public class App {
     if (line.hasOption("remind")) {
       currentTask.setNeedReminder();
     }
+    if (line.hasOption("task-id")) {
+      currentTask.TaskID = Integer.parseInt(line.getOptionValue("task-id"));
+    }
 
     if (line.hasOption("add")) {
       currentTask.setDescription(line.getOptionValue("add"));
@@ -53,6 +57,8 @@ public class App {
       listTasks(type, currentTask, sortBy);
     } else if (line.hasOption("delete")) {
       deleteTask(line.getOptionValue("delete"));
+    } else if (line.hasOption("change")) {
+      changeTask(currentTask);
     } else {
       System.err.println("Failed to parse command line arguments");
       printAppHelp();
@@ -64,7 +70,6 @@ public class App {
     var tasks = jedis.hgetAll("tasks");
     tasks.put(Integer.toString(task.TaskID), task.taskToString());
     jedis.hmset("tasks", tasks);
-    System.out.println("Task serialized is " + task.taskToString());
     System.out.println("Put task with id " + task.TaskID + " with description \"" + task.Description + "\"");
   }
 
@@ -113,14 +118,30 @@ public class App {
     System.out.print(TaskWrite.serializeTasks(tasksArray));
   }
 
-  private void deleteTask(String uuid) {
+  private void deleteTask(String taskID) {
     Jedis jedis = new Jedis();
     var tasks = jedis.hgetAll("tasks");
-    if (tasks.containsKey(uuid)) {
-      jedis.hdel("tasks", uuid);
+    if (tasks.containsKey(taskID)) {
+      jedis.hdel("tasks", taskID);
       System.out.println("Deleted successfully!");
     } else {
-      System.out.println("No task found with such uuid");
+      System.out.println("No task found with such task_id");
+    }
+  }
+
+  private void changeTask(Task updateTask) {
+    String taskID = String.valueOf(updateTask.TaskID);
+    Jedis jedis = new Jedis();
+    var tasks = jedis.hgetAll("tasks");
+    if (tasks.containsKey(taskID)) {
+      Task targetTask = new Task(Integer.parseInt(taskID));
+      targetTask.fromString(tasks.get(taskID));
+      targetTask.changeTask(updateTask);
+      tasks.put(Integer.toString(targetTask.TaskID), targetTask.taskToString());
+      jedis.hmset("tasks", tasks);
+      System.out.println("Task changed successfully!");
+    } else {
+      System.out.println("No task found with such task_id " + Integer.toString(updateTask.TaskID));
     }
   }
 
@@ -160,6 +181,9 @@ public class App {
     options.addOption("pr", "priority", true, "Task priority, one of {LOW, MEDIUM, HIGH}");
     options.addOption("t", "tag", true, "Task tag, may be multiple");
     options.addOption("s", "sort-by", true, "Value to sort tasks by, supported 'priority', 'deadline'");
+    options.addOption("r", "remind", false, "Remind about task");
+    options.addOption("tid", "task-id", true, "TaskID");
+    options.addOption("c", "change", false, "Change task by task_id");
 
     return options;
   }
