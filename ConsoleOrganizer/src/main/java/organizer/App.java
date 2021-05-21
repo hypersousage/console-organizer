@@ -65,8 +65,16 @@ public class App {
     }
   }
 
+  private String getRedisHost() {
+    String host = "localhost";
+    if (System.getenv("ORGANIZER_DOCKER_BUILD") != null) {
+      host = "host.docker.internal";
+    }
+    return host;
+  }
+
   private void addTask(Task task) {
-    Jedis jedis = new Jedis();
+    Jedis jedis = new Jedis(getRedisHost());
     var tasks = jedis.hgetAll("tasks");
     tasks.put(Integer.toString(task.TaskID), task.taskToString());
     jedis.hmset("tasks", tasks);
@@ -85,7 +93,7 @@ public class App {
     boolean sortByPriority = sortBy.equals("priority");
     boolean sortByDeadline = sortBy.equals("deadline");
     TaskWriter TaskWrite = new SimpleWriter(sortByDeadline, sortByPriority);
-    Jedis jedis = new Jedis();
+    Jedis jedis = new Jedis(getRedisHost());
     var tasks = jedis.hgetAll("tasks");
     int size = tasks.size();
     if (size == 0) {
@@ -119,7 +127,7 @@ public class App {
   }
 
   private void deleteTask(String taskID) {
-    Jedis jedis = new Jedis();
+    Jedis jedis = new Jedis(getRedisHost());
     var tasks = jedis.hgetAll("tasks");
     if (tasks.containsKey(taskID)) {
       jedis.hdel("tasks", taskID);
