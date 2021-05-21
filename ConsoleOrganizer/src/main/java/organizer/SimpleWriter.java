@@ -37,7 +37,7 @@ public class SimpleWriter extends TaskWriter {
         @Override
         public int compare(Task o1, Task o2) {
           if (o1.Priority != null && o2.Priority != null) {
-            return o1.Priority.compareTo(o2.Priority);
+            return -o1.Priority.compareTo(o2.Priority);
           }
           if (o1.Priority != null) {
             return -1;

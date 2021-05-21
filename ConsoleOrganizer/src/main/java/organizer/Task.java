@@ -123,4 +123,16 @@ public class Task {
     }
     return true;
   }
+
+  public void changeTask(Task task) {
+    if (task.Deadline != null) {
+      this.Deadline = task.Deadline;
+    }
+    if (task.Priority != null) {
+      this.Priority = task.Priority;
+    }
+    if (task.Tags.size() > 0) {
+      this.Tags = task.Tags;
+    }
+  }
 }
