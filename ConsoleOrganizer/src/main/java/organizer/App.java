@@ -7,6 +7,9 @@ import com.google.gson.Gson;
 
 import java.io.IOException;
 import java.util.*;
+import java.text.SimpleDateFormat;
+import java.text.DateFormat;
+import java.lang.Thread;
 import java.text.MessageFormat;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -59,6 +62,8 @@ public class App {
       deleteTask(line.getOptionValue("delete"));
     } else if (line.hasOption("change")) {
       changeTask(currentTask);
+    } else if (line.hasOption("notify")) {
+      notifyAboutTasks();
     } else {
       System.err.println("Failed to parse command line arguments");
       printAppHelp();
@@ -153,6 +158,36 @@ public class App {
     }
   }
 
+  public void notifyAboutTasks() {
+    Calendar tomorrow = Calendar.getInstance();
+    Calendar today = Calendar.getInstance();
+    tomorrow.add(Calendar.DATE, 1);
+    Jedis jedis = new Jedis();
+    var tasks = jedis.hgetAll("tasks");
+    for (Map.Entry<String, String> entry : tasks.entrySet()) {
+      Task task = new Task(0);
+      if (task.fromString(entry.getValue()) && task.Reminder) {
+        Calendar curDate = Calendar.getInstance();
+        curDate.setTime(task.Deadline);
+        if (today.compareTo(curDate) < 0 && tomorrow.compareTo(curDate) > 0) {
+          try {
+            DateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+            String deadlineStr = formatter.format(task.Deadline);
+            var command = String.format(
+                    "display notification \"%s is due on %s\" with title \"%s\" sound name \"Purr\"",
+                    task.Description, deadlineStr, "ConsoleOrganizer notification");
+            var runtime = Runtime.getRuntime();
+            String[] code = {"osascript", "-e", command};
+            var process = runtime.exec(code);
+            Thread.sleep(2000);
+            //var sleed_process = runtime.exec(code_sleep);
+          } catch (IOException ex) {}
+          catch (InterruptedException ex1) {}
+        }
+      }
+    }
+  }
+
   private CommandLine parseArguments(String[] args) {
     Options options = getOptions();
     CommandLine line = null;
@@ -192,6 +227,7 @@ public class App {
     options.addOption("r", "remind", false, "Remind about task");
     options.addOption("tid", "task-id", true, "TaskID");
     options.addOption("c", "change", false, "Change task by task_id");
+    options.addOption("n", "notify", false, "Notify about tasks");
 
     return options;
   }
